@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qubiz Job Scraper - Documentation</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }
+    h1 { color: #159FBC; }
+    h2 { color: #002432; margin-top: 30px; }
+    pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+    code { background: #f4f4f4; padding: 2px 5px; border-radius: 3px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #159FBC; color: white; }
+  </style>
+</head>
+<body>
+  <h1>QUBIZ SRL - Job Scraper</h1>
+  <p>A Node.js scraper for extracting job listings from Qubiz Careers and storing them in Solr for peviitor.ro.</p>
+
+  <h2>Company Info</h2>
+  <table>
+    <tr><th>Field</th><th>Value</th></tr>
+    <tr><td>Legal Name</td><td>QUBIZ SRL</td></tr>
+    <tr><td>CIF/CUI</td><td>24049362</td></tr>
+    <tr><td>Registration</td><td>J05/1563/2008</td></tr>
+    <tr><td>Address</td><td>Strada Louis Pasteur 165A, Oradea, Bihor</td></tr>
+    <tr><td>Website</td><td><a href="https://qubiz.com">https://qubiz.com</a></td></tr>
+    <tr><td>Careers</td><td><a href="https://qubiz.com/careers">https://qubiz.com/careers</a></td></tr>
+  </table>
+
+  <h2>Project Structure</h2>
+  <pre>
+├── index.js
+├── company.js
+├── demoanaf.js
+├── solr.js
+├── company.json
+├── package.json
+├── .github/workflows/
+│   ├── scrape.yml
+│   └── test.yml
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── e2e/
+└── README.md
+  </pre>
+
+  <h2>Usage</h2>
+  <pre>npm install
+npm run scrape
+npm test</pre>
+
+  <h2>Workflows</h2>
+  <p>The scraper runs daily at 6 AM UTC via GitHub Actions.</p>
+</body>
+</html>

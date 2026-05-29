@@ -115,7 +115,7 @@ This project was developed with assistance from:
 
 ## License
 
-Copyright (c) 2026 BOGA SEBASTIAN-NICOLAE
+Copyright (c) 2026 BADEA MELANIA
 
 Licensed under the [MIT License](LICENSE).
 

@@ -1,0 +1,78 @@
+{
+  "validatedAt": "2026-05-29T10:00:00.000Z",
+  "source": "ANAF",
+  "brand": "Qubiz",
+  "anaf": {
+    "cui": 24049362,
+    "name": "QUBIZ SRL",
+    "address": "MUNICIPIUL ORADEA, BIHOR, STR DR. LOUIS PASTEUR, NR.165A",
+    "registrationNumber": "J2008001563054",
+    "phone": "",
+    "fax": "",
+    "postalCode": "410181",
+    "caenCode": "6201",
+    "iban": "",
+    "registrationState": "INREGISTRAT din data 13.06.2008",
+    "registrationDate": "2008-06-13",
+    "fiscalAuthority": "Administratia Judeteana a Finantelor Publice Bihor",
+    "ownershipForm": "PROPR.PRIVATA-CAPITAL PRIVAT AUTOHTON",
+    "organizationForm": "PERSOANA JURIDICA",
+    "legalForm": "SOCIETATE COMERCIALĂ CU RĂSPUNDERE LIMITATĂ",
+    "vatRegistered": true,
+    "vatPeriods": [
+      {
+        "start": "2008-06-13",
+        "end": null,
+        "yearStart": "",
+        "message": ""
+      }
+    ],
+    "cashBasisVat": false,
+    "cashBasisVatStart": null,
+    "cashBasisVatEnd": null,
+    "inactive": false,
+    "inactiveSince": null,
+    "reactivatedSince": null,
+    "splitVat": false,
+    "eFacturaRegistered": false,
+    "headquartersAddress": {
+      "street": "Str. Dr. Louis Pasteur",
+      "number": "165A",
+      "locality": "Mun. Oradea",
+      "county": "BIHOR",
+      "country": "Romania",
+      "postalCode": "410181"
+    },
+    "fiscalAddress": {
+      "street": "",
+      "number": "",
+      "locality": "",
+      "county": "",
+      "country": "",
+      "postalCode": ""
+    },
+    "administrators": [],
+    "authorizedCaenCodes": [
+      "6201",
+      "6202",
+      "6209",
+      "6311",
+      "7022"
+    ],
+    "onrcStatus": 1048,
+    "onrcStatusLabel": "Funcțiune"
+  },
+  "peviitor": null,
+  "summary": {
+    "company": "QUBIZ SRL",
+    "cif": "24049362",
+    "active": true,
+    "inactiveSince": null,
+    "reactivatedSince": null,
+    "address": "MUNICIPIUL ORADEA, BIHOR, STR DR. LOUIS PASTEUR, NR.165A",
+    "registrationNumber": "J2008001563054",
+    "caenCode": "6201",
+    "vatRegistered": true,
+    "eFacturaRegistered": false
+  }
+}

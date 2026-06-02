@@ -94,7 +94,7 @@ async function validateJobs(cif) {
 
   const { querySOLR } = await import("./solr.js");
   const result = await querySOLR(cif);
-  const urls = result.docs.map(doc => doc.url);
+  const urls = result.response?.docs?.map(doc => doc.url) || [];
 
   console.log(`Found ${urls.length} jobs for CIF ${cif}\n`);
 

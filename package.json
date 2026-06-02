@@ -1,14 +1,27 @@
 {
   "name": "scraper-qubiz-ro",
   "version": "1.0.0",
+  "description": "Web scraper pentru a aduce locurile de munca de la Qubiz in platforma peviitor.ro",
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "scrape": "node index.js",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPattern=unit",
-    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPattern=integration",
-    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPattern=e2e"
+    "validate-jobs": "node --no-deprecation validate-jobs.js 24049362",
+    "scrape": "node --no-deprecation index.js",
+    "test": "node --no-deprecation --experimental-vm-modules ./node_modules/jest/bin/jest.js",
+    "test:unit": "node --no-deprecation --experimental-vm-modules ./node_modules/jest/bin/jest.js tests/unit",
+    "test:integration": "node --no-deprecation --experimental-vm-modules ./node_modules/jest/bin/jest.js tests/integration",
+    "test:e2e": "node --no-deprecation --experimental-vm-modules ./node_modules/jest/bin/jest.js tests/e2e"
+  },
+  "jest": {
+    "testTimeout": 30000,
+    "reporters": [
+      "default",
+      "jest-html-reporter"
+    ]
+  },
+  "jest-html-reporter": {
+    "pageTitle": "Qubiz Scraper Test Report",
+    "outputPath": "test-report.html"
   },
   "dependencies": {
     "node-fetch": "^3.3.2",
@@ -18,12 +31,5 @@
   "devDependencies": {
     "jest": "^29.7.0",
     "jest-html-reporter": "^3.5.0"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "testMatch": ["**/tests/**/*.test.js"],
-    "verbose": true,
-    "reporters": ["default", "jest-html-reporter"],
-    "defaultTimeout": 30000
   }
 }

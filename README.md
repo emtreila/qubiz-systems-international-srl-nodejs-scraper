@@ -1,29 +1,31 @@
-# QUBIZ SRL - Job Scraper
+# QUBIZ SRL - Node.js Scraper
 
-[![WebScraper Qubiz to Peviitor](https://github.com/emtreila/qubiz-systems-international-srl-nodejs-scraper/actions/workflows/scrape.yml/badge.svg)](https://github.com/emtreila/qubiz-systems-international-srl-nodejs-scraper/actions/workflows/scrape.yml)
+[![Scrape Qubiz Jobs](https://github.com/emtreila/qubiz-systems-international-srl-nodejs-scraper/actions/workflows/scrape.yml/badge.svg)](https://github.com/emtreila/qubiz-systems-international-srl-nodejs-scraper/actions/workflows/scrape.yml)
 [![Automation Tests](https://github.com/emtreila/qubiz-systems-international-srl-nodejs-scraper/actions/workflows/test.yml/badge.svg)](https://github.com/emtreila/qubiz-systems-international-srl-nodejs-scraper/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![JavaScript](https://img.shields.io/badge/javascript-ESM-F7DF1E?logo=javascript&logoColor=black)](https://ecma-international.org/)
+[![Node.js](https://img.shields.io/badge/node-24-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 
-A Node.js scraper for extracting job listings from Qubiz Careers and storing them in Solr for [peviitor.ro](https://peviitor.ro).
+Web scraper pentru a aduce locurile de munca de la Qubiz in platforma [peviitor.ro](https://peviitor.ro).
 
-## Overview
+## Company Details
 
-This project automates the daily scraping of Qubiz job listings in Romania, ensuring the peviitor.ro job board stays up-to-date with the latest career opportunities.
-
-## Features
-
-- Scrapes job listings from Qubiz Careers (https://qubiz.com/careers)
-- Validates company data via ANAF (Romanian National Employment Agency)
-- Stores jobs in Solr with proper data validation
-- GitHub Actions workflow for daily automated scraping
-- Comprehensive test suite for reliability
+- **Brand**: Qubiz
+- **Legal Name**: QUBIZ SRL
+- **CUI/CIF**: 24049362
+- **Registration Number**: J05/1563/2008
+- **Source**: Qubiz Careers (HTML scraping)
 
 ## Project Structure
 
 ```
-├── index.js           # Main scraper entry point
+├── index.js           # Main scraper orchestrator
 ├── company.js         # Company validation via ANAF
-├── demoanaf.js        # ANAF API integration
+├── demoanaf.js        # ANAF CLI wrapper
 ├── solr.js            # Solr database operations
+├── validate-jobs.js   # Job URL validator
+├── src/
+│   └── anaf.js        # Core ANAF library
 ├── company.json       # Cached company data
 ├── tests/             # Test suite
 │   ├── unit/
@@ -32,97 +34,59 @@ This project automates the daily scraping of Qubiz job listings in Romania, ensu
 ├── .github/
 │   └── workflows/
 │       ├── scrape.yml     # Daily scraping workflow
-│       └── test.yml      # Test automation
-└── package.json
-```
-
-## Setup
-
-### Prerequisites
-
-- Node.js 24+
-- npm
-
-### Installation
-
-```bash
-npm install
-```
-
-### Configuration
-
-Set the `SOLR_AUTH` environment variable with your Solr credentials:
-
-```bash
-export SOLR_AUTH="username:password"
+│       ├── test.yml      # Test automation
+│       └── deploy.yml    # GitHub Pages deploy
+├── AGENTS.md           # AI agent rules
+├── ISSUES.md           # Issue process
+├── ROBOTS.md           # API terms analysis
+├── CONTRIBUTING.md     # Contribution guide
+├── SECURITY.md         # Security policy
+├── CHANGELOG.md        # Version history
+├── instructions.md     # Workflow documentation
+├── files.md            # File roles
+├── company-model.md    # Company schema
+└── job-model.md        # Job schema
 ```
 
 ## Usage
 
-### Run the Scraper
-
 ```bash
+npm install
 npm run scrape
 ```
 
-### Run Tests
+## Scraping Flow
 
-```bash
-# All tests
-npm test
+1. Query Solr for existing jobs by CIF
+2. Validate company via ANAF API
+3. Scrape job listings from Qubiz Careers (HTML parsing)
+4. Map jobs to the standard job model
+5. Transform jobs for Solr (filter Romanian cities, normalize fields)
+6. Upsert jobs to Solr
+7. Save backup to `jobs.json`
 
-# Unit tests only
-npm run test:unit
+## Robots.txt Policy
 
-# Integration tests
-npm run test:integration
+Acest scraper foloseste HTML scraping pe pagina publica de cariere Qubiz. Pentru analiza completa, vezi [ROBOTS.md](ROBOTS.md).
 
-# E2E tests
-npm run test:e2e
-```
+- Scraper-ul este politicos: o singura cerere pe sesiune, User-Agent identificabil (`job_seeker_ro_spider`)
 
 ## Workflows
 
 ### Daily Scraping
 
-The `scrape.yml` workflow runs daily at 6 AM UTC via GitHub Actions. It:
-1. Validates company data via ANAF
-2. Scrapes current job listings from Qubiz Careers
-3. Updates Solr with new/removed jobs
-4. Uploads job data as artifacts
+The `scrape.yml` workflow runs daily at 6 AM UTC via GitHub Actions.
 
 ### Test Automation
 
-The `test.yml` workflow runs on every push and pull request. It:
-1. Ensures Qubiz exists in the company core
-2. Runs unit, integration, and E2E tests
-3. Validates data integrity in Solr
-
-## Company Details
-
-- **Legal Name**: QUBIZ SRL
-- **CIF/CUI**: 24049362
-- **Registration**: J05/1563/2008
-- **Address**: Strada Louis Pasteur 165A, Oradea, Bihor, Romania
-- **Website**: https://qubiz.com
-- **Careers**: https://qubiz.com/careers
-
-## Acknowledgments
-
-This project was developed with assistance from:
-- **[OpenCode](https://opencode.ai)** - AI-powered CLI tool for software engineering
-- **Big Pickle LLM** - Large language model powering OpenCode
+The `test.yml` workflow runs on every push and pull request, plus a daily validation of existing jobs.
 
 ## License
 
-Copyright (c) 2026 BADEA MELANIA
+Copyright (c) 2026 BOGA SEBASTIAN-NICOLAE
 
 Licensed under the [MIT License](LICENSE).
 
 ## Managed By
 
 This project is managed by [ASOCIATIA OPORTUNITATI SI CARIERE](https://oportunitatisicariere.ro) and used as a web scraper for the [peviitor.ro](https://peviitor.ro) job board project.
-
-## Disclaimer
-
-This scraper is designed for educational purposes and legitimate job data aggregation for the Romanian job market. Please respect Qubiz's Terms of Service and robots.txt when using this scraper.

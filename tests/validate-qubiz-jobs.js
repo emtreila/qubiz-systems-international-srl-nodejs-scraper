@@ -1,6 +1,5 @@
 import { querySOLR, deleteJobByUrl } from "../solr.js";
 import fetch from "node-fetch";
-import fs from "fs";
 
 const COMPANY_CIF = "24049362";
 const TIMEOUT = 10000;
@@ -8,9 +7,8 @@ const TIMEOUT = 10000;
 async function checkUrl(url) {
   try {
     const res = await fetch(url, {
-      method: "HEAD",
-      timeout: TIMEOUT,
-      headers: { "User-Agent": "Mozilla/5.0" }
+      signal: AbortSignal.timeout(TIMEOUT),
+      headers: { "User-Agent": "job_seeker_ro_spider" }
     });
     return { url, status: res.status, valid: res.ok };
   } catch (err) {
@@ -25,44 +23,49 @@ async function main() {
   console.log(`=== Validate Qubiz Jobs (${dryRun ? "DRY RUN" : "LIVE"}) ===\n`);
 
   const result = await querySOLR(COMPANY_CIF);
-  console.log(`Total jobs in SOLR: ${result.numFound}\n`);
+  const numFound = result?.response?.numFound || 0;
+  console.log(`Total jobs in SOLR: ${numFound}\n`);
 
-  if (result.numFound === 0) {
+  if (numFound === 0) {
     console.log("No jobs to validate.");
     return;
   }
 
-  const jobs = result.docs;
+  const jobs = result.response.docs;
   const invalidUrls = [];
 
   for (let i = 0; i < jobs.length; i++) {
     const job = jobs[i];
     const res = await checkUrl(job.url);
     const status = res.status > 0 ? res.status : "ERR";
-    const icon = res.valid ? "✅" : "❌";
+    const icon = res.valid ? "[OK]" : "[X]";
     console.log(`${icon} [${i+1}/${jobs.length}] ${status} - ${job.title} (${job.url})`);
     if (!res.valid) invalidUrls.push(job.url);
   }
 
   if (invalidUrls.length > 0) {
-    console.log(`\n⚠️ ${invalidUrls.length} invalid URLs found`);
+    console.log(`\n${invalidUrls.length} invalid URLs found`);
 
     if (doDelete) {
       console.log("Deleting invalid jobs from SOLR...");
       for (const url of invalidUrls) {
         await deleteJobByUrl(url);
       }
-      console.log(`✅ Deleted ${invalidUrls.length} invalid jobs`);
+      console.log(`Deleted ${invalidUrls.length} invalid jobs`);
     } else {
       console.log("Dry run - no deletions performed.");
       console.log("Run with --delete flag to remove invalid jobs.");
     }
   } else {
-    console.log("\n✅ All jobs valid!");
+    console.log("\nAll jobs valid!");
   }
 }
 
-main().catch(err => {
-  console.error("Validation failed:", err);
-  process.exit(1);
-});
+if (process.argv[1]?.includes('validate-qubiz-jobs')) {
+  main().catch(err => {
+    console.error("Validation failed:", err);
+    process.exit(1);
+  });
+}
+
+export { checkUrl };

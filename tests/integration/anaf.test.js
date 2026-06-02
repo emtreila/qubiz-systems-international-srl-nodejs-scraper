@@ -1,4 +1,4 @@
-import { getCompanyFromANAF, searchCompany } from "../../demoanaf.js";
+import { getCompanyFromANAF, searchCompany } from "../../src/anaf.js";
 
 describe("ANAF API Integration", () => {
   test("should search for Qubiz", async () => {

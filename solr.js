@@ -1,261 +1,162 @@
-import fetch from "node-fetch";
-import fs from "fs";
+import fetch from 'node-fetch';
 
-const SOLR_URL = "https://solr.peviitor.ro/solr/job";
-const SOLR_COMPANY_URL = "https://solr.peviitor.ro/solr/company";
+const SOLR_URL = process.env.SOLR_URL || 'https://solr.peviitor.ro/solr/job';
+const SOLR_COMPANY_URL = process.env.SOLR_COMPANY_URL || 'https://solr.peviitor.ro/solr/company';
 const TIMEOUT = 10000;
 
 export function getSolrAuth() {
-  return process.env.SOLR_AUTH;
+  const auth = process.env.SOLR_AUTH;
+  if (!auth) return null;
+  return 'Basic ' + Buffer.from(auth).toString('base64');
+}
+
+function getHeaders() {
+  const headers = { 'Content-Type': 'application/json', 'User-Agent': 'job_seeker_ro_spider' };
+  const auth = getSolrAuth();
+  if (auth) headers['Authorization'] = auth;
+  return headers;
 }
 
 export async function querySOLR(cif) {
-  const AUTH = process.env.SOLR_AUTH;
-  if (!AUTH) throw new Error("SOLR_AUTH not set in environment");
-
-  const params = new URLSearchParams({
-    q: `cif:${cif}`,
-    rows: 100,
-    wt: "json"
+  const url = `${SOLR_URL}/select?q=cif:${cif}&rows=100&wt=json`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(TIMEOUT),
   });
 
-  const res = await fetch(`${SOLR_URL}/select?${params}`, {
-    headers: {
-      "Authorization": "Basic " + Buffer.from(AUTH).toString("base64"),
-      "User-Agent": "Mozilla/5.0"
-    }
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`SOLR query error: ${res.status} - ${text}`);
+  if (!response.ok) {
+    throw new Error(`SOLR query error: ${response.status}`);
   }
 
-  const data = await res.json();
-  return data.response;
+  return response.json();
 }
 
 export async function queryCompanySOLR(companyQuery) {
-  const AUTH = process.env.SOLR_AUTH;
-  if (!AUTH) throw new Error("SOLR_AUTH not set in environment");
-
-  const params = new URLSearchParams({
-    q: companyQuery,
-    rows: 10,
-    wt: "json"
+  const url = `${SOLR_COMPANY_URL}/select?q=${encodeURIComponent(companyQuery)}&rows=10&wt=json`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(TIMEOUT),
   });
 
-  const res = await fetch(`${SOLR_COMPANY_URL}/select?${params}`, {
-    headers: {
-      "Authorization": "Basic " + Buffer.from(AUTH).toString("base64"),
-      "User-Agent": "Mozilla/5.0"
-    }
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`SOLR company query error: ${res.status} - ${text}`);
+  if (!response.ok) {
+    throw new Error(`SOLR company query error: ${response.status}`);
   }
 
-  const data = await res.json();
-  return data.response;
+  return response.json();
 }
 
 export async function deleteJobsByCIF(cif) {
-  const AUTH = process.env.SOLR_AUTH;
-  if (!AUTH) throw new Error("SOLR_AUTH not set in environment");
+  const url = `${SOLR_URL}/update?commit=true`;
+  const body = { delete: { query: `cif:${cif}` } };
 
-  const params = new URLSearchParams({ commit: "true" });
-
-  const deleteQuery = JSON.stringify({
-    delete: { query: `cif:${cif}` }
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(TIMEOUT),
   });
 
-  const res = await fetch(`${SOLR_URL}/update?${params}`, {
-    method: "POST",
-    headers: {
-      "Authorization": "Basic " + Buffer.from(AUTH).toString("base64"),
-      "Content-Type": "application/json",
-      "User-Agent": "Mozilla/5.0"
-    },
-    body: deleteQuery
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`SOLR delete error: ${res.status} - ${text}`);
+  if (!response.ok) {
+    throw new Error(`SOLR delete error: ${response.status}`);
   }
 
-  console.log("✅ Jobs deleted from SOLR.");
+  return response.json();
 }
 
 export async function deleteJobByUrl(url) {
-  const AUTH = process.env.SOLR_AUTH;
-  if (!AUTH) throw new Error("SOLR_AUTH not set in environment");
+  const solrUrl = `${SOLR_URL}/update?commit=true`;
+  const body = { delete: { query: `url:"${url}"` } };
 
-  const params = new URLSearchParams({ commit: "true" });
-
-  const deleteQuery = JSON.stringify({
-    delete: { query: `url:"${url}"` }
+  const response = await fetch(solrUrl, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(TIMEOUT),
   });
 
-  const res = await fetch(`${SOLR_URL}/update?${params}`, {
-    method: "POST",
-    headers: {
-      "Authorization": "Basic " + Buffer.from(AUTH).toString("base64"),
-      "Content-Type": "application/json",
-      "User-Agent": "Mozilla/5.0"
-    },
-    body: deleteQuery
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`SOLR delete error: ${res.status} - ${text}`);
+  if (!response.ok) {
+    throw new Error(`SOLR delete by URL error: ${response.status}`);
   }
+
+  return response.json();
+}
+
+export async function upsertCompany(companyData) {
+  const url = `${SOLR_COMPANY_URL}/update/json?commit=true`;
+
+  const AUTH = process.env.SOLR_AUTH;
+  const headers = {
+    'Content-Type': 'application/json',
+    'User-Agent': 'job_seeker_ro_spider'
+  };
+  if (AUTH) headers['Authorization'] = 'Basic ' + Buffer.from(AUTH).toString('base64');
+
+  const payload = Array.isArray(companyData) ? companyData : [companyData];
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`SOLR company upsert error: ${response.status}`);
+  }
+
+  return response.json();
 }
 
 export async function upsertJobs(jobs) {
-  const AUTH = process.env.SOLR_AUTH;
-  if (!AUTH) throw new Error("SOLR_AUTH not set in environment");
+  const url = `${SOLR_URL}/update?commit=true`;
 
-  const params = new URLSearchParams({ commit: "true" });
-
-  const body = JSON.stringify(jobs);
-
-  const res = await fetch(`${SOLR_URL}/update?${params}`, {
-    method: "POST",
-    headers: {
-      "Authorization": "Basic " + Buffer.from(AUTH).toString("base64"),
-      "Content-Type": "application/json",
-      "User-Agent": "Mozilla/5.0"
-    },
-    body
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(jobs),
+    signal: AbortSignal.timeout(30000),
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`SOLR upsert error: ${res.status} - ${text}`);
+  if (!response.ok) {
+    throw new Error(`SOLR upsert error: ${response.status}`);
   }
 
-  console.log(`✅ Upserted ${jobs.length} jobs to SOLR.`);
+  return response.json();
 }
 
-async function checkUrl(url) {
+export async function checkUrl(url) {
   try {
-    const res = await fetch(url, {
-      method: "HEAD",
-      timeout: TIMEOUT,
-      headers: { "User-Agent": "Mozilla/5.0" }
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(5000),
     });
-    return { url, status: res.status, valid: res.ok };
-  } catch (err) {
-    return { url, status: 0, valid: false, error: err.message };
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
-async function runVerification(cif) {
-  console.log("=== Verify SOLR Jobs ===\n");
-
-  const result = await querySOLR(cif);
-  console.log(`Total jobs in SOLR for CIF ${cif}: ${result.numFound}`);
-
-  console.log("\nFirst 5 jobs:");
-  result.docs.slice(0, 5).forEach((job, i) => {
-    console.log(`${i+1}. ${job.title} (${job.location?.join(', ')}) - ${job.workmode}`);
-  });
-
-  if (fs.existsSync("jobs_existing.json")) {
-    console.log("\n=== Verify existing URLs ===\n");
-    const existing = JSON.parse(fs.readFileSync("jobs_existing.json", "utf-8"));
-    const existingJobs = existing.jobs || [];
-    console.log(`Checking ${existingJobs.length} URLs...`);
-
-    const invalidUrls = [];
-    for (let i = 0; i < existingJobs.length; i++) {
-      const job = existingJobs[i];
-      const res = await checkUrl(job.url);
-      console.log(`[${i+1}/${existingJobs.length}] ${res.status > 0 ? res.status : 'ERR'} - ${job.url}`);
-      if (!res.valid) invalidUrls.push(job.url);
-    }
-
-    if (invalidUrls.length > 0) {
-      console.log(`\n⚠️ ${invalidUrls.length} invalid URLs found - deleting from SOLR...`);
-      for (const url of invalidUrls) {
-        await deleteJobByUrl(url);
-      }
-      console.log(`✅ Deleted ${invalidUrls.length} invalid jobs from SOLR`);
-    }
-
-    if (invalidUrls.length === 0) {
-      console.log("\n✅ All URLs valid - deleting jobs_existing.json");
-      fs.unlinkSync("jobs_existing.json");
-    } else {
-      console.log("⚠️ Keeping jobs_existing.json for reference");
-    }
-  }
-}
-
-async function runExtract(cif) {
-  console.log("=== Extract existing jobs from SOLR ===\n");
-
-  try {
-    const result = await querySOLR(cif);
-    console.log(`Found ${result.numFound} existing jobs in SOLR for CIF ${cif}`);
-
-    if (result.numFound === 0) {
-      console.log("No existing jobs to backup.");
-      return;
-    }
-
-    const backup = {
-      extractedAt: new Date().toISOString(),
-      cif: cif,
-      count: result.numFound,
-      jobs: result.docs
-    };
-
-    fs.writeFileSync("jobs_existing.json", JSON.stringify(backup, null, 2), "utf-8");
-    console.log("\n✅ Saved existing jobs to jobs_existing.json\n");
-  } catch (err) {
-    console.error("Failed to extract existing jobs:", err.message);
-    process.exit(1);
-  }
-}
-
-async function runCompanyQuery(args) {
-  console.log("=== Query Company in SOLR ===\n");
-
-  const query = args[1] || "company:QUBIZ*";
-  console.log(`Query: ${query}`);
-
-  const result = await queryCompanySOLR(query);
-  console.log(`Found ${result.numFound} companies`);
-
-  if (result.docs?.length) {
-    console.log("\nFirst company:");
-    console.log(JSON.stringify(result.docs[0], null, 2));
-  }
-}
-
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("solr.js")) {
+async function main() {
   const args = process.argv.slice(2);
 
-  if (args.includes("extract")) {
-    const cif = args[1] || null;
-    if (!cif) {
-      console.error("Error: CIF required. Usage: node solr.js extract <CIF>");
-      process.exit(1);
-    }
-    await runExtract(cif);
-  } else if (args.includes("company")) {
-    await runCompanyQuery(args);
+  if (args[0] === 'extract' && args[1]) {
+    const result = await querySOLR(args[1]);
+    const { writeFileSync } = await import('fs');
+    writeFileSync('jobs_existing.json', JSON.stringify(result.response?.docs || [], null, 2));
+    console.log(`Extracted ${result.response?.numFound || 0} existing jobs for CIF ${args[1]}`);
+  } else if (args[0] === 'company') {
+    const result = await queryCompanySOLR('*:*');
+    console.log(JSON.stringify(result, null, 2));
+  } else if (args[0]) {
+    const result = await querySOLR(args[0]);
+    console.log(`Found ${result.response?.numFound || 0} jobs for CIF ${args[0]}`);
   } else {
-    const cif = args[0] || null;
-    if (!cif) {
-      console.error("Error: CIF required. Usage: node solr.js <CIF>");
-      process.exit(1);
-    }
-    await runVerification(cif);
+    console.log('Usage: node solr.js <CIF> | node solr.js extract <CIF> | node solr.js company');
   }
+}
+
+if (process.argv[1]?.includes('solr')) {
+  main();
 }

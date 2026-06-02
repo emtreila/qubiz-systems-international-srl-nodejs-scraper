@@ -1,32 +1,49 @@
 import fetch from "node-fetch";
 import * as cheerio from "cheerio";
-import fs from "fs";
-import { fileURLToPath } from "url";
-import { validateAndGetCompany } from "./company.js";
-import { querySOLR, deleteJobByUrl, upsertJobs } from "./solr.js";
+import { writeFileSync } from "fs";
+import { pathToFileURL } from "url";
+import * as company from "./company.js";
+import * as solr from "./solr.js";
 
+const COMPANY_BRAND = "Qubiz";
 const COMPANY_CIF = "24049362";
-const TIMEOUT = 10000;
-const JOB_BASE = "https://qubiz.com";
+const COMPANY_NAME = "QUBIZ SRL";
 const CAREERS_URL = "https://qubiz.com/careers";
-let COMPANY_NAME = null;
+const JOB_BASE = "https://qubiz.com";
+const TIMEOUT = 10000;
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const ROMANIAN_CITIES = new Set([
+  'Bucharest', 'București', 'Cluj-Napoca', 'Cluj Napoca', 'Cluj',
+  'Timișoara', 'Timisoara', 'Iași', 'Iasi', 'Brașov', 'Brasov',
+  'Constanța', 'Constanta', 'Craiova', 'Bacău', 'Sibiu',
+  'Târgu Mureș', 'Targu Mures', 'Oradea', 'Baia Mare', 'Satu Mare',
+  'Ploiești', 'Ploiesti', 'Pitești', 'Pitesti', 'Arad', 'Galați', 'Galati',
+  'Brăila', 'Braila', 'Drobeta-Turnu Severin', 'Râmnicu Vâlcea', 'Ramnicu Valcea',
+  'Buzău', 'Buzau', 'Botoșani', 'Botosani', 'Zalău', 'Zalau', 'Hunedoara', 'Deva',
+  'Suceava', 'Bistrița', 'Bistrita', 'Tulcea', 'Călărași', 'Calarasi',
+  'Giurgiu', 'Alba Iulia', 'Slatina', 'Piatra Neamț', 'Piatra Neamt', 'Roman',
+  'Dumbrăvița', 'Dumbravita', 'Voluntari', 'Popești-Leordeni', 'Popesti-Leordeni',
+  'Chitila', 'Mogoșoaia', 'Mogosoaia', 'Otopeni'
+]);
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 async function fetchCareersPage() {
-  const res = await fetch(CAREERS_URL, {
+  const response = await fetch(CAREERS_URL, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+      "User-Agent": "job_seeker_ro_spider",
       "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-    }
+    },
+    signal: AbortSignal.timeout(TIMEOUT),
   });
 
-  if (!res.ok) {
-    throw new Error(`Careers page error: ${res.status}`);
+  if (!response.ok) {
+    throw new Error(`Careers page error: ${response.status}`);
   }
 
-  const html = await res.text();
-  return html;
+  return response.text();
 }
 
 function parseJobsFromHtml(html) {
@@ -85,42 +102,28 @@ function parseJobsFromHtml(html) {
   return jobs;
 }
 
-function mapToJobModel(rawJob, cif, companyName = COMPANY_NAME) {
-  const now = new Date().toISOString();
-
+function mapToJobModel(rawJob, cif, companyName) {
   const job = {
     url: rawJob.url,
     title: rawJob.title,
     company: companyName,
-    cif: cif,
-    location: rawJob.location?.length ? rawJob.location : undefined,
-    tags: rawJob.tags?.length ? rawJob.tags : undefined,
-    workmode: rawJob.workmode || undefined,
-    date: now,
-    status: "scraped"
+    cif,
+    location: rawJob.location,
+    tags: rawJob.tags,
+    workmode: rawJob.workmode,
+    date: new Date().toISOString(),
+    status: 'scraped',
   };
 
-  Object.keys(job).forEach((k) => job[k] === undefined && delete job[k]);
+  Object.keys(job).forEach(key => {
+    if (job[key] === undefined) delete job[key];
+  });
 
   return job;
 }
 
 function transformJobsForSOLR(payload) {
-  const romanianCities = [
-    'Bucharest', 'București', 'Cluj-Napoca', 'Cluj Napoca',
-    'Timișoara', 'Timisoara', 'Iași', 'Iasi', 'Brașov', 'Brasov',
-    'Constanța', 'Constanta', 'Craiova', 'Bacău', 'Sibiu',
-    'Târgu Mureș', 'Targu Mures', 'Oradea', 'Baia Mare', 'Satu Mare',
-    'Ploiești', 'Ploiesti', 'Pitești', 'Pitesti', 'Arad', 'Galați', 'Galati',
-    'Brăila', 'Braila', 'Drobeta-Turnu Severin', 'Râmnicu Vâlcea', 'Ramnicu Valcea',
-    'Buzău', 'Buzau', 'Botoșani', 'Botosani', 'Zalău', 'Zalau', 'Hunedoara', 'Deva',
-    'Suceava', 'Bistrița', 'Bistrita', 'Tulcea', 'Călărași', 'Calarasi',
-    'Giurgiu', 'Alba Iulia', 'Slatina', 'Piatra Neamț', 'Piatra Neamt', 'Roman',
-    'Dumbrăvița', 'Dumbravita', 'Voluntari', 'Popești-Leordeni', 'Popesti-Leordeni',
-    'Chitila', 'Mogoșoaia', 'Mogosoaia', 'Otopeni'
-  ];
-
-  const citySet = new Set(romanianCities.map(c => c.toLowerCase()));
+  const citySet = new Set(Array.from(ROMANIAN_CITIES).map(c => c.toLowerCase()));
 
   const normalizeWorkmode = (wm) => {
     if (!wm) return undefined;
@@ -132,7 +135,7 @@ function transformJobsForSOLR(payload) {
 
   const transformed = {
     ...payload,
-    company: payload.company?.toUpperCase(),
+    company: COMPANY_NAME,
     jobs: payload.jobs.map(job => {
       const validLocations = (job.location || []).filter(loc => {
         const lower = loc.toLowerCase().trim();
@@ -142,6 +145,7 @@ function transformJobsForSOLR(payload) {
 
       return {
         ...job,
+        company: COMPANY_NAME,
         location: validLocations.length > 0 ? validLocations : ['România'],
         workmode: normalizeWorkmode(job.workmode)
       };
@@ -152,69 +156,82 @@ function transformJobsForSOLR(payload) {
 }
 
 async function main() {
-  const testOnlyOnePage = process.argv.includes("--test");
+  console.log(`[${COMPANY_BRAND} Scraper] Starting...`);
 
   try {
-    console.log("=== Step 1: Get existing jobs count ===");
-    const existingResult = await querySOLR(COMPANY_CIF);
-    const existingCount = existingResult.numFound;
-    console.log(`Found ${existingCount} existing jobs in SOLR`);
+    try {
+      const existingResult = await solr.querySOLR(COMPANY_CIF);
+      const existingCount = existingResult?.response?.numFound || 0;
+      console.log(`[${COMPANY_BRAND} Scraper] Existing jobs in SOLR: ${existingCount}`);
+    } catch (e) {
+      console.warn(`[${COMPANY_BRAND} Scraper] SOLR unavailable (${e.message}), continuing without existing count`);
+    }
 
-    console.log("=== Step 2: Validate company via ANAF ===");
-    const { company, cif } = await validateAndGetCompany();
-    COMPANY_NAME = company;
-    const localCif = cif;
+    try {
+      const companyData = await company.validateAndGetCompany();
+      if (companyData && companyData.status === 'active') {
+        console.log(`[${COMPANY_BRAND} Scraper] Company validated: ${companyData.company} (CIF: ${companyData.cif})`);
+        try {
+          await solr.upsertCompany({
+            id: COMPANY_CIF,
+            company: COMPANY_NAME,
+            brand: COMPANY_BRAND,
+            status: 'activ',
+            location: ['Oradea', 'Cluj-Napoca'],
+            website: ['https://www.qubiz.com'],
+            career: ['https://qubiz.com/careers'],
+            lastScraped: new Date().toISOString().split('T')[0],
+            scraperFile: 'https://raw.githubusercontent.com/emtreila/qubiz-systems-international-srl-nodejs-scraper/master/.github/workflows/scrape.yml'
+          });
+        } catch (err) {
+          console.log(`[${COMPANY_BRAND} Scraper] Note: Could not upsert company to SOLR core: ${err.message}`);
+        }
+      } else {
+        console.warn(`[${COMPANY_BRAND} Scraper] Company validation: ${companyData?.status || 'unknown'}`);
+      }
+    } catch (e) {
+      console.warn(`[${COMPANY_BRAND} Scraper] Company validation skipped (${e.message})`);
+    }
 
-    console.log("=== Step 3: Scrape Qubiz Careers ===");
-    console.log(`Fetching careers page: ${CAREERS_URL}`);
+    console.log(`[${COMPANY_BRAND} Scraper] Fetching careers page: ${CAREERS_URL}`);
     const html = await fetchCareersPage();
     const rawJobs = parseJobsFromHtml(html);
-    const scrapedCount = rawJobs.length;
-    console.log(`📊 Jobs scraped from Qubiz Careers: ${scrapedCount}`);
+    console.log(`[${COMPANY_BRAND} Scraper] Scraped ${rawJobs.length} raw jobs`);
 
     rawJobs.forEach((job, i) => {
       console.log(`  ${i+1}. ${job.title} - ${job.location.join(", ") || "N/A"} (${job.workmode})`);
     });
 
-    const jobs = rawJobs.map(job => mapToJobModel(job, localCif));
+    const mappedJobs = rawJobs.map(job => mapToJobModel(job, COMPANY_CIF, COMPANY_NAME));
+    console.log(`[${COMPANY_BRAND} Scraper] Mapped ${mappedJobs.length} jobs`);
 
-    const payload = {
-      source: "qubiz.com",
-      scrapedAt: new Date().toISOString(),
-      company: COMPANY_NAME,
-      cif: localCif,
-      jobs
-    };
+    const solrReadyJobs = transformJobsForSOLR({ source: "qubiz.com", company: COMPANY_NAME, cif: COMPANY_CIF, jobs: mappedJobs });
+    console.log(`[${COMPANY_BRAND} Scraper] Transformed ${solrReadyJobs.jobs.length} jobs for SOLR`);
 
-    console.log("Transforming jobs for SOLR...");
-    const transformedPayload = transformJobsForSOLR(payload);
-    const validCount = transformedPayload.jobs.filter(j => j.location).length;
-    console.log(`📊 Jobs with valid Romanian locations: ${validCount}`);
+    if (solrReadyJobs.jobs.length > 0) {
+      try {
+        console.log(`[${COMPANY_BRAND} Scraper] Deleting existing jobs for CIF ${COMPANY_CIF}...`);
+        await solr.deleteJobsByCIF(COMPANY_CIF);
+        console.log(`[${COMPANY_BRAND} Scraper] Old jobs deleted. Upserting ${solrReadyJobs.jobs.length} jobs...`);
+        const result = await solr.upsertJobs(solrReadyJobs.jobs);
+        console.log(`[${COMPANY_BRAND} Scraper] Upsert result:`, result);
+      } catch (e) {
+        console.warn(`[${COMPANY_BRAND} Scraper] SOLR upsert failed (${e.message}), saving locally only`);
+      }
+    }
 
-    fs.writeFileSync("jobs.json", JSON.stringify(transformedPayload, null, 2), "utf-8");
-    console.log("Saved jobs.json");
+    writeFileSync('jobs.json', JSON.stringify(solrReadyJobs.jobs, null, 2));
+    console.log(`[${COMPANY_BRAND} Scraper] Jobs saved to jobs.json`);
 
-    console.log("\n=== Step 4: Upsert jobs to SOLR ===");
-    await upsertJobs(transformedPayload.jobs);
-
-    const finalResult = await querySOLR(COMPANY_CIF);
-    console.log(`\n📊 === SUMMARY ===`);
-    console.log(`📊 Jobs existing in SOLR before scrape: ${existingCount}`);
-    console.log(`📊 Jobs scraped from Qubiz website: ${scrapedCount}`);
-    console.log(`📊 Jobs in SOLR after scrape: ${finalResult.numFound}`);
-    console.log(`====================`);
-
-    console.log("\n=== DONE ===");
-    console.log("Scraper completed successfully!");
-
+    console.log(`[${COMPANY_BRAND} Scraper] Done! ${solrReadyJobs.jobs.length} jobs processed.`);
   } catch (err) {
-    console.error("Scraper failed:", err);
+    console.error(`[${COMPANY_BRAND} Scraper] Error:`, err.message);
     process.exit(1);
   }
 }
 
 export { parseJobsFromHtml, mapToJobModel, transformJobsForSOLR };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }

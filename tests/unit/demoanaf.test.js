@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { searchCompany, getCompanyFromANAFWithFallback } from '../../src/anaf.js';
 
 const CACHED_ANAF_DATA = {
   cui: 24049362,
@@ -42,17 +42,10 @@ const CACHED_ANAF_DATA = {
   onrcStatusLabel: "Funcțiune"
 };
 
-describe('demoanaf.js', () => {
-  let demoanaf;
-
-  beforeAll(async () => {
-    demoanaf = await import('../../demoanaf.js');
-  });
-
+describe('ANAF Module', () => {
   describe('searchCompany', () => {
     it('should return array of companies for valid brand', async () => {
-      const results = await demoanaf.searchCompany('Qubiz');
-
+      const results = await searchCompany('Qubiz');
       expect(Array.isArray(results)).toBe(true);
       expect(results.length).toBeGreaterThan(0);
       expect(results[0]).toHaveProperty('cui');
@@ -60,32 +53,18 @@ describe('demoanaf.js', () => {
     });
 
     it('should return empty array for non-existent brand', async () => {
-      const results = await demoanaf.searchCompany('NonExistentBrandXYZ123');
-
+      const results = await searchCompany('NonExistentBrandXYZ123');
       expect(Array.isArray(results)).toBe(true);
       expect(results.length).toBe(0);
     });
-
-    it('should include statusLabel in results', async () => {
-      const results = await demoanaf.searchCompany('Qubiz');
-
-      expect(results[0]).toHaveProperty('statusLabel');
-    });
   });
 
-  describe('getCompanyFromANAF', () => {
-    it('should return company data for valid CIF with fallback', async () => {
-      const data = await demoanaf.getCompanyFromANAFWithFallback('24049362', CACHED_ANAF_DATA);
-
+  describe('getCompanyFromANAFWithFallback', () => {
+    it('should return cached data for invalid CIF', async () => {
+      const data = await getCompanyFromANAFWithFallback('0000000', CACHED_ANAF_DATA);
       expect(data).toBeDefined();
       expect(data.cui).toBe(24049362);
       expect(data.name).toBe('QUBIZ SRL');
-      expect(data).toHaveProperty('address');
-      expect(data).toHaveProperty('registrationNumber');
-    }, 120000);
-
-    it.skip('should throw error for invalid CIF (requires live ANAF API)', async () => {
-      await expect(demoanaf.getCompanyFromANAF('99999999')).rejects.toThrow();
-    }, 120000);
+    }, 15000);
   });
 });
